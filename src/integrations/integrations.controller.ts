@@ -12,7 +12,7 @@ export class IntegrationsController {
   async convertToVoice(@Body() data: ElevenLabsInputDto, @Res() res: Response,): Promise<any> {
     const stream = await this.integrationsService.convertToVoice(data);
 
-    const filename = data.filename || 'speech.mp3';
+    const filename = this.integrationsService.getFormattedFileName();
 
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
@@ -27,8 +27,7 @@ export class IntegrationsController {
       return { error: 'No file uploaded' };
     }
 
-    const text = await this.integrationsService.convertToText(file);
-    return { text };
+    return this.integrationsService.convertToText(file);
   }
 
 }
