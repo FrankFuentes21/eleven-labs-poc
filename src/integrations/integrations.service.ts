@@ -33,7 +33,7 @@ export class IntegrationsService {
     const VOICE_ID = this.configService.get<string>('VOICE_ID');
     const TTS_MODEL = this.configService.get<string>('TTS_MODEL');
     const PRONUNCIATION_DICTIONARY_ID = this.configService.get<string>('PRONUNCIATION_DICTIONARY_ID');
-    const PRONUNCIATION_DICTIONARY_VERSION_ID = this.configService.get<string>('PRONUNCIATION_DICTIONARY_VERSION_ID');
+    //const PRONUNCIATION_DICTIONARY_VERSION_ID = this.configService.get<string>('PRONUNCIATION_DICTIONARY_VERSION_ID');
 
     const voice = await firstValueFrom(
       this.httpService.post(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
@@ -42,7 +42,7 @@ export class IntegrationsService {
         pronunciation_dictionary_locators: [
           {
             pronunciation_dictionary_id: PRONUNCIATION_DICTIONARY_ID,
-            version_id: PRONUNCIATION_DICTIONARY_VERSION_ID
+            //version_id: PRONUNCIATION_DICTIONARY_VERSION_ID
           }
         ]
       }, {
@@ -63,7 +63,33 @@ export class IntegrationsService {
     return voice.data
   }
 
-  async convertToText(file: Express.Multer.File): Promise<any> {
+  async saveToDictionary(phonemes: any[]): Promise<any> {
+    const ELEVEN_LABS_API_KEY = this.configService.get<string>('ELEVEN_LABS_API_KEY');
+    const PRONUNCIATION_DICTIONARY_ID = this.configService.get<string>('PRONUNCIATION_DICTIONARY_ID');
+
+    const rules = phonemes.map(rule => ({
+      string_to_replace: rule.word,
+      //phoneme: rule.phoneme,
+      type: "alias",
+      //alphabet: "ipa",
+      alias: rule.phoneme,
+    }));
+
+    const response = await firstValueFrom(
+      this.httpService.post(`https://api.elevenlabs.io/v1/pronunciation-dictionaries/${PRONUNCIATION_DICTIONARY_ID}/add-rules`, {
+        rules
+      }, {
+        headers: {
+          'xi-api-key': ELEVEN_LABS_API_KEY,
+          'Content-Type': 'application/json',
+        }
+      })
+    );
+
+    return response.data;
+  }
+
+  async convertToText(file: Express.Multer.File, phrase: string): Promise<any> {
     const ELEVEN_LABS_API_KEY = this.configService.get<string>('ELEVEN_LABS_API_KEY');
     const MODEL = this.configService.get<string>('STT_MODEL');
 
@@ -87,7 +113,12 @@ export class IntegrationsService {
       }),
     );
 
-    return { phonemes: phonemize(response.data.text), text: response.data.text };
+    const phoneme = phonemize(response.data.text);
+    console.log({ phoneme, text: response.data.text, phrase });
+
+    await this.saveToDictionary([{ word: phrase, phoneme: response.data.text }]);
+
+    return this.convertToVoice({ text: response.data.text })
   }
 
 }
